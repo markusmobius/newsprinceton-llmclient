@@ -19,7 +19,8 @@ yesno_schema={
       "enum": ["yes", "no"]
     }
   },
-  "required": ["answer"]
+  "required": ["answer"],
+  "additionalProperties": False
 }
 chat = Chat(responseSchema=yesno_schema) 
 chat.AddSystemMessage("You are a helpful assistant.")
@@ -37,7 +38,8 @@ countrylist_schema={
       }
     }
   },
-  "required": ["items"]
+  "required": ["items"],
+  "additionalProperties": False
 }
 chat = Chat(responseSchema=countrylist_schema) 
 chat.AddSystemMessage("You are a helpful assistant.")
@@ -53,7 +55,8 @@ numeric_schema={
         "description": "The numerical answer to the question."
       }
   },
-  "required": ["answer"]
+  "required": ["answer"],
+  "additionalProperties": False
 }
 chat = Chat(responseSchema=numeric_schema) 
 chat.AddSystemMessage("You are a helpful assistant.")
@@ -83,7 +86,8 @@ string_schema={
           "type": "string"
         }
     },
-    "required": ["answer"]
+    "required": ["answer"],
+    "additionalProperties": False
 }
 chat = Chat(responseSchema=string_schema) 
 chat.AddSystemMessage("You are a helpful assistant.")

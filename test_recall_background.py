@@ -27,7 +27,7 @@ recall_schema={
     }
   },
   "required": ["matching_fact","rating","reasoning"],
-  "strict": True
+  "additionalProperties": False
 }
 
 chat = Chat(responseSchema=recall_schema) 
