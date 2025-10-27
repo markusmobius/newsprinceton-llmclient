@@ -1,0 +1,4 @@
+setuptools
+jsonschema
+aiohttp
+asyncio
