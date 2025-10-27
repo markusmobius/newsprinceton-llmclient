@@ -2,10 +2,14 @@ from setuptools import setup, find_packages
 
 setup(
     name='LlmClient',
-    version='1.0.1',
+    version='1.0.2',
     description='Python library for LLM client',
     url='https://github.com/markusmobius/newsprinceton-llmclient',
     packages=find_packages(),
-    package_data={'': []},
+    install_requires=[
+        'jsonschema',
+        'aiohttp',
+        'asyncio'
+    ],    
     include_package_data=True
 )
