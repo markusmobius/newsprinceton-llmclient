@@ -38,6 +38,23 @@ class Chat:
         """Returns the JSON string representation of the query."""
         return json.dumps(self.query, indent=4)
 
+class Embedding:
+    def __init__(self, text: str, model : str = "text-embedding-3-large_1"):
+        self.embedding = {
+                "model": model,
+                "text" : text
+            }
+
+
+    def getRaw(self):
+        """Returns the JSON representation of the embedding."""
+        return self.embedding
+
+    def getJSON(self):
+        """Returns the JSON string representation of the embedding."""
+        return json.dumps(self.embedding, indent=4)
+
+
 class Dto:
     def __init__(self, chat: Chat, tags: list[str], cache_only: bool = False):
          self.dto={
@@ -49,6 +66,19 @@ class Dto:
     def getJSON(self):
         """Returns the JSON string representation of the dto object."""
         return json.dumps(self.dto, indent=4)
+
+class EmbeddingDto:
+    def __init__(self, embedding : Embedding, tags: list[str], cache_only: bool = False):
+         self.dto={
+            "embed" : embedding.getRaw(),
+            "tags" : tags,
+            "cache_only": cache_only
+         }
+
+    def getJSON(self):
+        """Returns the JSON string representation of the dto object."""
+        return json.dumps(self.dto, indent=4)
+
 
 class DtoSet:
     def __init__(self, chats: list[Chat], tags: list[str]):
@@ -75,7 +105,7 @@ class Llm:
         self.errors = 0
         self.results = []
 
-    async def _send_task_to_api(self, session, task_data):
+    async def _send_task_to_api(self, session, task_data : Dto):
         headers = {"Authorization": f"Bearer {os.environ['llmcode']}", "Content-Type": "application/json"}
         try:
             async with session.post(self.api_endpoint,
@@ -127,6 +157,14 @@ class Llm:
         tasks : list[Dto] = []
         for chat in chats:
             dto = Dto(chat, tags, cache_only)
+            tasks.append(dto)
+
+        return asyncio.run(self.execute_tasks_async(tasks))
+
+    def execute_embeddings(self, embeddings: list[Embedding], tags: list[str], cache_only: bool = False):
+        tasks : list[EmbeddingDto] = []
+        for embed in embeddings:
+            dto = EmbeddingDto(embed, tags, cache_only)
             tasks.append(dto)
 
         return asyncio.run(self.execute_tasks_async(tasks))
