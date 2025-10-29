@@ -38,7 +38,6 @@ chats.append(chat)
 #execute them
 llm = Llm()
 responses=llm.execute_chats(chats,["example"])
-exit
 
 for i,response in enumerate(responses):
     print(f"Task {i}")

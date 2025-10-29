@@ -106,12 +106,11 @@ chats.append(chat)
 
 chat = Chat(responseSchema=string_schema) 
 chat.AddSystemMessage("You are a helpful assistant.")
-chat.AddUserMessage("Who invented the light bulb? Return as JSON.")
+chat.AddUserMessage("Who invented the incandescent light bulb? Return as JSON.")
 chats.append(chat)
 
 llm = Llm()
 responses=llm.execute_chats(chats,["example"])
-exit
 
 for i,response in enumerate(responses):
     print(f"Task {i}")

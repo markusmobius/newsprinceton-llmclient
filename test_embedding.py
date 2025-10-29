@@ -3,12 +3,11 @@ import json
 
 #define the embedding
 embeddings = []
-embeddings.append(Embedding("Hello lila wunderland"))
-embeddings.append(Embedding("JFK was the brother of RFK."))
+embeddings.append(Embedding("Hello lila super wunderland"))
+embeddings.append(Embedding("JFK was the older brother of RFK and the President."))
 
 llm = Llm()
 responses=llm.execute_embeddings(embeddings=embeddings,tags=["example"])
-exit
 
 for i,response in enumerate(responses):
     print(f"Task {i}")

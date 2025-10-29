@@ -42,7 +42,7 @@ llm = Llm()
 llm.execute_chats_background(chats,["backgroundexample"])
 print("submitted background job - sleeping for 20 seconds")
 sleep(20)
-exit
+
 print("re-submitted job (only cached results) - this should give immediate results")
 responses=llm.execute_chats(chats,["example"],True)
 
