@@ -3,9 +3,9 @@ import grpc
 import uuid
 from .message_pb2 import SimpleMessage # Your protobuf messages
 from .message_pb2_grpc import MessagesStub  # Your gRPC service stub
-from ChunkWriter import ChunkWriter  # Utility for writing chunks
+from .ChunkWriter import ChunkWriter  # Utility for writing chunks
 import os
-from Models import Chat, Embedding
+from .Models import Chat, Embedding
 import json
 import time
 
