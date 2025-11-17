@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+option csharp_namespace = "MessageClient";
+
+package messageengine;
+
+service Messages {
+  rpc SendMessage(SimpleMessage) returns (SimpleMessage) {};
+
+  rpc UploadMessage(stream SimpleMessage) returns (SimpleMessage) {}
+
+  rpc DownloadMessage(SimpleMessage) returns (stream SimpleMessage) {}
+
+  rpc BidirectionalMessage(stream SimpleMessage) returns (stream SimpleMessage) {}
+}
+
+//simple messages
+message SimpleMessage {
+  string mtype = 1;
+  bytes payload = 2;
+}

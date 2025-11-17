@@ -1,5 +1,4 @@
 setuptools
 jsonschema
-aiohttp
-asyncio
-requests
+grpcio
+grpcio-tools

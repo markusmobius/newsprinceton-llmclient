@@ -1,180 +1,208 @@
 import asyncio
-import aiohttp
-import requests
-import json
-from jsonschema import Draft202012Validator, SchemaError
+import grpc
+import uuid
+from message_pb2 import Message   # Your protobuf messages
+from message_pb2_grpc import MessagesStub  # Your gRPC service stub
+from ChunkWriter import ChunkWriter  # Utility for writing chunks
 import os
-from typing import Any
+from Models import Chat, Embedding
+import json
+import time
 
-class Chat:
-    def __init__(self, responseSchema: Any, model : str = "gpt-5-mini_2025-08-07"):
-        #check that we have valid JSON schema
-        if responseSchema!=None:
+class GrpcConnection:
+    """
+    Owns ONE shared gRPC channel.
+    You can create many client sessions (streams) on this channel.
+    """
+
+    def __init__(self):
+        self.channel = grpc.aio.secure_channel(
+            os.environ["LLM_SERVER_URL"],
+            grpc.ssl_channel_credentials()
+        )
+        self.stub = MessagesStub(self.channel)
+
+    async def close(self):
+        await self.channel.close()
+
+
+class BidirectionalClient:
+    """
+    A single streaming message client that:
+        - connects automatically when created
+        - manages its own streams
+        - has its own heartbeat
+    """
+
+    def __init__(self, engineType: str, connection : GrpcConnection):
+        # no await here!
+        self.engineType = engineType
+        self.conn = connection
+        self.stub = connection.stub
+
+        self.guid = uuid.uuid4().hex
+
+        self.is_connected = False
+
+        self.call = None
+        self.heartbeat_call = None
+
+        self._msg_future = None
+        self._heartbeat_future = None
+
+        self._heartbeat_task = None
+
+    # ----------------------------------------
+    # FACTORY METHOD (async init)
+    # ----------------------------------------
+    @classmethod
+    async def create(cls, engineType: str, connection : GrpcConnection):
+        """
+        Async factory method that constructs AND connects a session.
+        """
+        self = cls(engineType, connection)
+        await self._connect()
+        return self
+
+    # ----------------------------------------
+    # STREAM READERS
+    # ----------------------------------------
+    async def _read_call_stream(self):
+        async for msg in self.call:
+            if self._msg_future and not self._msg_future.done():
+                self._msg_future.set_result(msg)
+
+    async def _read_heartbeat_stream(self):
+        async for msg in self.heartbeat_call:
+            if self._heartbeat_future and not self._heartbeat_future.done():
+                self._heartbeat_future.set_result(msg)
+
+    # ----------------------------------------
+    # MAIN CONNECT LOGIC
+    # ----------------------------------------
+    async def _connect(self):
+        if self.is_connected:
+            return
+
+        # open two independent streaming RPCs
+        self.call = self.stub.BidirectionalMessage()
+        self.heartbeat_call = self.stub.BidirectionalMessage()
+
+        # start background readers
+        asyncio.create_task(self._read_call_stream())
+        asyncio.create_task(self._read_heartbeat_stream())
+
+        # handshake
+        hello = Message(mtype=self.engineType, payload=self.guid.encode())
+        res = await self.send_receive(hello)
+
+        self.from_scratch = (res.mtype == "fresh")
+        print("session:", "first-time" if self.from_scratch else "reused")
+
+        # start heartbeat
+        await self.heartbeat_call.write(
+            Message(mtype="__heartbeat__", payload=self.guid.encode())
+        )
+        self._heartbeat_task = asyncio.create_task(self._heartbeat_loop())
+
+        self.is_connected = True
+
+        writer=ChunkWriter()
+        writer.write_str(os.environ["LLM_USER_CODE"])
+        await self.send_receive(Message(mtype="__initengine__", payload=writer.close()))
+
+
+    # ----------------------------------------
+    # HEARTBEAT LOOP
+    # ----------------------------------------
+    async def _heartbeat_loop(self):
+        while True:
+            await self.heartbeat_call.write(
+                Message(mtype="__heartbeat__", payload=self.guid.encode())
+            )
+            await asyncio.sleep(10)
+
+    # ----------------------------------------
+    # SEND/RECEIVE HELPERS
+    # ----------------------------------------
+    async def send_receive(self, message):
+        loop = asyncio.get_running_loop()
+        self._msg_future = loop.create_future()
+
+        await self.call.write(message)
+        return await self._msg_future
+
+
+    async def close(self):
+        if self._heartbeat_task:
+            self._heartbeat_task.cancel()
+
+        if self.call:
+            await self.call.done_writing()
+
+        if self.heartbeat_call:
+            await self.heartbeat_call.done_writing()
+
+class LlmClient:
+
+    def __init__(self, connection : GrpcConnection):
+        self.connection = connection
+
+    async def connect(self):
+        self.client = await BidirectionalClient.create("llm",self.connection)
+    
+    async def SendSurely(self, message):
+        while True:
             try:
-                Draft202012Validator.check_schema(responseSchema)
-            except SchemaError as e:
-                raise Exception(f"JSON schema is invalid: {e.message}")
-        self.query = {
-                "model": model,
-                "messages": [],
-                "ResponseSchema": json.dumps(responseSchema)
-            }
+                response = await self.client.send_receive(message)
+                return response.payload.decode()
+            except Exception as e:
+                print(f"Error during Ask: {e}. Retrying...")
+                time.sleep(5)
 
 
-    def AddSystemMessage(self, message):
-        self.query["messages"].append({"role": "system", "content": message})
+    async def Ask(self, chat : Chat, tags : list[str], cache_only : bool = False, retries: int = -1):
+        writer=ChunkWriter()
+        writer.write_str(chat.getJSON())
+        writer.write_str(json.dumps(tags))
+        if cache_only:
+            writer.write_int(1)
+        else:
+            writer.write_int(0)
+        writer.write_int(retries)
+        return await self.SendSurely(Message(mtype="ask", payload=writer.close()))
 
-    def AddAssistantMessage(self, message):
-        self.query["messages"].append({"role": "assistant", "content": message})
+    async def AskMany(self, chats : list[Chat], tags : list[str], retries: int = -1):
+        writer=ChunkWriter()
+        writer.write_str(json.dumps(chats, default=lambda obj: obj.getJSON(), indent=4))
+        writer.write_str(json.dumps(tags))
+        writer.write_int(retries)        
+        return await self.SendSurely(Message(mtype="askmany", payload=writer.close()))
 
-    def AddUserMessage(self, message):
-        self.query["messages"].append({"role": "user", "content": message})
+    async def Embed(self, input : Embedding, tags : list[str], cache_only : bool = False, retries: int = -1):
+        writer=ChunkWriter()
+        writer.write_str(input.getJSON())
+        writer.write_str(json.dumps(tags))
+        if cache_only:
+            writer.write_int(1)
+        else:
+            writer.write_int(0)
+        writer.write_int(retries)
+        return await self.SendSurely(Message(mtype="embed", payload=writer.close()))
 
-    def getRaw(self):
-        """Returns the JSON representation of the query."""
-        return self.query
-
-    def getJSON(self):
-        """Returns the JSON string representation of the query."""
-        return json.dumps(self.query, indent=4)
-
-class Embedding:
-    def __init__(self, text: str, model : str = "text-embedding-3-large_1"):
-        self.embedding = {
-                "model": model,
-                "text" : text
-            }
-
-
-    def getRaw(self):
-        """Returns the JSON representation of the embedding."""
-        return self.embedding
-
-    def getJSON(self):
-        """Returns the JSON string representation of the embedding."""
-        return json.dumps(self.embedding, indent=4)
-
-
-class Dto:
-    def __init__(self, chat: Chat, tags: list[str], cache_only: bool = False):
-         self.dto={
-            "chat" : chat.getRaw(),
-            "tags" : tags,
-            "cache_only": cache_only
-         }
-
-    def getJSON(self):
-        """Returns the JSON string representation of the dto object."""
-        return json.dumps(self.dto, indent=4)
-
-class EmbeddingDto:
-    def __init__(self, embedding : Embedding, tags: list[str], cache_only: bool = False):
-         self.dto={
-            "embed" : embedding.getRaw(),
-            "tags" : tags,
-            "cache_only": cache_only
-         }
-
-    def getJSON(self):
-        """Returns the JSON string representation of the dto object."""
-        return json.dumps(self.dto, indent=4)
+    async def AskMany(self, inputs : list[Embedding], tags : list[str], retries: int = -1):
+        writer=ChunkWriter()
+        writer.write_str(json.dumps(inputs, default=lambda obj: obj.getJSON(), indent=4))
+        writer.write_str(json.dumps(tags))
+        writer.write_int(retries)        
+        return await self.SendSurely(Message(mtype="embedmany", payload=writer.close()))
 
 
-class DtoSet:
-    def __init__(self, chats: list[Chat], tags: list[str]):
-        self.dto={
-            "chats" : [],
-            "tags" : tags
-        }
-        for chat in chats:
-            self.dto["chats"].append(chat.getRaw())
+class LlmFactory:
+    def __init__(self):
+        self.connection = GrpcConnection()
 
-    def getJSON(self):
-        """Returns the JSON string representation of the dto object."""
-        return json.dumps(self.dto, indent=4)
-
-
-class Llm:
-
-    def __init__(self, batch_size: int = 10):
-        self.api_endpoint = os.environ["llmserverurl"]+"/llm/run"
-        self.api_endpointbackground = os.environ["llmserverurl"]+"/llm/runbackground"
-        self.batch_size = batch_size
-        self.total_tasks = 0
-        self.completed_tasks = 0
-        self.errors = 0
-        self.results = []
-
-    async def _send_task_to_api(self, session, task_data : Dto):
-        headers = {"Authorization": f"Bearer {os.environ['llmcode']}", "Content-Type": "application/json"}
-        try:
-            async with session.post(self.api_endpoint,
-                                    data=task_data.getJSON(),
-                                    headers=headers) as response:
-                response.raise_for_status()
-                js = await response.json()
-                if js.get("error"):
-                    self.errors += 1
-                else:
-                    self.completed_tasks += 1
-                return js
-        except aiohttp.ClientError as e:
-            self.errors += 1
-            return {"answer": None, "error": str(e)}
-
-    async def execute_tasks_async(self, tasks: list):
-        """
-        Launch all tasks immediately but never allow more than
-        self.batch_size concurrent HTTP requests.
-        """
-        self.total_tasks = len(tasks)
-        self.completed_tasks = 0
-        self.errors = 0
-        self.results = [None] * self.total_tasks
-
-        sem = asyncio.Semaphore(self.batch_size)
-
-        async def worker(idx, task_data, session):
-            async with sem:
-                result = await self._send_task_to_api(session, task_data)
-                self.results[idx] = result
-                print(
-                    f"Status: {self.completed_tasks}/{self.total_tasks} tasks done "
-                    f"[errors: {self.errors}].",
-                    end="\r",
-                    flush=True,
-                )
-
-        async with aiohttp.ClientSession() as session:
-            # create and schedule all tasks at once
-            coros = [worker(i, t, session) for i, t in enumerate(tasks)]
-            await asyncio.gather(*coros)
-
-        print()  # move to a new line after progress output
-        return self.results
-
-    def execute_chats(self, chats: list[Chat], tags: list[str], cache_only: bool = False):
-        tasks : list[Dto] = []
-        for chat in chats:
-            dto = Dto(chat, tags, cache_only)
-            tasks.append(dto)
-
-        return asyncio.run(self.execute_tasks_async(tasks))
-
-    def execute_embeddings(self, embeddings: list[Embedding], tags: list[str], cache_only: bool = False):
-        tasks : list[EmbeddingDto] = []
-        for embed in embeddings:
-            dto = EmbeddingDto(embed, tags, cache_only)
-            tasks.append(dto)
-
-        return asyncio.run(self.execute_tasks_async(tasks))
-
-
-    def execute_chats_background(self, chats: list[Chat], tags: list[str]):
-        headers = {"Authorization": f"Bearer {os.environ['llmcode']}", "Content-Type": "application/json"}
-        payload = DtoSet(chats, tags).getJSON()
-        try:
-            response = requests.post(self.api_endpointbackground, data=payload, headers=headers)
-        except:
-            print("error submitting the background job")
-
+    async def create_client(self):
+        client = LlmClient(self.connection)
+        await client.connect()
+        return client

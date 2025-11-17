@@ -106,7 +106,7 @@ chats.append(chat)
 
 chat = Chat(responseSchema=string_schema) 
 chat.AddSystemMessage("You are a helpful assistant.")
-chat.AddUserMessage("Who invented the incandescent light bulb? Return as JSON.")
+chat.AddUserMessage("Who invented the tetanus vaccine some time ago? Return as JSON.")
 chats.append(chat)
 
 llm = Llm()
