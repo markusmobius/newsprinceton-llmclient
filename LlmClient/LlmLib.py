@@ -1,8 +1,8 @@
 import asyncio
 import grpc
 import uuid
-from message_pb2 import Message   # Your protobuf messages
-from message_pb2_grpc import MessagesStub  # Your gRPC service stub
+from .message_pb2 import SimpleMessage # Your protobuf messages
+from .message_pb2_grpc import MessagesStub  # Your gRPC service stub
 from ChunkWriter import ChunkWriter  # Utility for writing chunks
 import os
 from Models import Chat, Embedding
@@ -93,7 +93,7 @@ class BidirectionalClient:
         asyncio.create_task(self._read_heartbeat_stream())
 
         # handshake
-        hello = Message(mtype=self.engineType, payload=self.guid.encode())
+        hello = SimpleMessage(mtype=self.engineType, payload=self.guid.encode())
         res = await self.send_receive(hello)
 
         self.from_scratch = (res.mtype == "fresh")
@@ -101,7 +101,7 @@ class BidirectionalClient:
 
         # start heartbeat
         await self.heartbeat_call.write(
-            Message(mtype="__heartbeat__", payload=self.guid.encode())
+            SimpleMessage(mtype="__heartbeat__", payload=self.guid.encode())
         )
         self._heartbeat_task = asyncio.create_task(self._heartbeat_loop())
 
@@ -109,7 +109,7 @@ class BidirectionalClient:
 
         writer=ChunkWriter()
         writer.write_str(os.environ["LLM_USER_CODE"])
-        await self.send_receive(Message(mtype="__initengine__", payload=writer.close()))
+        await self.send_receive(SimpleMessage(mtype="__initengine__", payload=writer.close()))
 
 
     # ----------------------------------------
@@ -118,7 +118,7 @@ class BidirectionalClient:
     async def _heartbeat_loop(self):
         while True:
             await self.heartbeat_call.write(
-                Message(mtype="__heartbeat__", payload=self.guid.encode())
+                SimpleMessage(mtype="__heartbeat__", payload=self.guid.encode())
             )
             await asyncio.sleep(10)
 
@@ -170,14 +170,14 @@ class LlmClient:
         else:
             writer.write_int(0)
         writer.write_int(retries)
-        return await self.SendSurely(Message(mtype="ask", payload=writer.close()))
+        return await self.SendSurely(SimpleMessage(mtype="ask", payload=writer.close()))
 
     async def AskMany(self, chats : list[Chat], tags : list[str], retries: int = -1):
         writer=ChunkWriter()
         writer.write_str(json.dumps(chats, default=lambda obj: obj.getJSON(), indent=4))
         writer.write_str(json.dumps(tags))
         writer.write_int(retries)        
-        return await self.SendSurely(Message(mtype="askmany", payload=writer.close()))
+        return await self.SendSurely(SimpleMessage(mtype="askmany", payload=writer.close()))
 
     async def Embed(self, input : Embedding, tags : list[str], cache_only : bool = False, retries: int = -1):
         writer=ChunkWriter()
@@ -188,14 +188,14 @@ class LlmClient:
         else:
             writer.write_int(0)
         writer.write_int(retries)
-        return await self.SendSurely(Message(mtype="embed", payload=writer.close()))
+        return await self.SendSurely(SimpleMessage(mtype="embed", payload=writer.close()))
 
     async def AskMany(self, inputs : list[Embedding], tags : list[str], retries: int = -1):
         writer=ChunkWriter()
         writer.write_str(json.dumps(inputs, default=lambda obj: obj.getJSON(), indent=4))
         writer.write_str(json.dumps(tags))
         writer.write_int(retries)        
-        return await self.SendSurely(Message(mtype="embedmany", payload=writer.close()))
+        return await self.SendSurely(SimpleMessage(mtype="embedmany", payload=writer.close()))
 
 
 class LlmFactory:
