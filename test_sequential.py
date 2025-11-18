@@ -2,17 +2,12 @@ import asyncio
 from  LlmClient.LlmLib import LlmFactory
 from LlmClient.Models import Chat
 
-async def process_chat(chat : Chat, client):
-    output=await client.Ask(chat,tags=["example"])
-    await client.Close()
-    print("HELLO")
-    return output 
 
 async def loop(chats: list[Chat]):
     factory=LlmFactory()
-    tasks = [process_chat(chat,await factory.create_client()) for chat in chats]
-    outputs = await asyncio.gather(*tasks)
-    for i,output in enumerate(outputs):
+    client=await factory.create_client()
+    for i,chat in enumerate(chats):
+      output=await client.Ask(chat,tags=["example"])
       print(f"Task {i}")
       print("chat:")
       print(chats[i].getJSON())
@@ -24,7 +19,7 @@ async def loop(chats: list[Chat]):
         print(output.answer)
       print("________________________________________________________")
       print("")
-
+    await client.Close()
 
 
 #define the chats
