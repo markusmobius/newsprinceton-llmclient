@@ -2,3 +2,4 @@ setuptools
 jsonschema
 grpcio
 grpcio-tools
+requests

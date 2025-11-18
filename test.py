@@ -1,8 +1,33 @@
-from  LlmClient.LlmLib import Chat, Llm
+import asyncio
+from http.client import responses
+from  LlmClient.LlmLib import LlmFactory
+from LlmClient.Models import Chat
 import json
 
-#define the chats
 
+async def process_chat(chat : Chat, client):
+    return await client.Ask(chat,tags=["example"])
+
+async def loop(chats: list[Chat]):
+    factory=LlmFactory()
+    tasks = [process_chat(chat,await factory.create_client()) for chat in chats]
+    outputs = await asyncio.gather(*tasks)
+    for i,output in enumerate(outputs):
+      print(f"Task {i}")
+      print("chat:")
+      print(chats[i].getJSON())
+      if output.error!=None:
+        print("ERROR:")    
+        print(output.error)
+    else:
+        print("RESPONSE:")    
+        print(output.answer)
+    print("________________________________________________________")
+    print("")
+
+
+
+#define the chats
 #response for this request is just a text
 chats=[]
 chat = Chat(responseSchema=None) 
@@ -109,20 +134,5 @@ chat.AddSystemMessage("You are a helpful assistant.")
 chat.AddUserMessage("Who invented the tetanus vaccine some time ago? Return as JSON.")
 chats.append(chat)
 
-llm = Llm()
-responses=llm.execute_chats(chats,["example"])
-
-for i,response in enumerate(responses):
-    print(f"Task {i}")
-    print("chat:")
-    print(chats[i].getJSON())
-    if response["error"]!=None:
-        print("ERROR:")    
-        print(response["error"])
-    else:
-        print("RESPONSE:")    
-        print(response["answer"])
-        print(f"Usage: {json.dumps(response["usage"])}")
-    print("________________________________________________________")
-    print("")
+asyncio.run(loop(chats))
 

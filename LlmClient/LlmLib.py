@@ -1,13 +1,17 @@
 import asyncio
+from attrs import fields
 import grpc
 import uuid
 from .message_pb2 import SimpleMessage # Your protobuf messages
 from .message_pb2_grpc import MessagesStub  # Your gRPC service stub
-from ChunkWriter import ChunkWriter  # Utility for writing chunks
+from .ChunkWriter import ChunkWriter  # Utility for writing chunks
+from .ChunkReader import ChunkReader  # Utility for reading chunks
 import os
-from Models import Chat, Embedding
+from .Models import Chat, Embedding
+from .LlmOutput import CachedEntry, RunMetaData, LlmOutput, LlmSimpleOutput
 import json
 import time
+import requests
 
 class GrpcConnection:
     """
@@ -17,9 +21,9 @@ class GrpcConnection:
 
     def __init__(self):
         self.channel = grpc.aio.secure_channel(
-            os.environ["LLM_SERVER_URL"],
-            grpc.ssl_channel_credentials()
-        )
+                    os.environ["LLM_SERVER_URL"],
+                        grpc.ssl_channel_credentials()
+                )
         self.stub = MessagesStub(self.channel)
 
     async def close(self):
@@ -60,8 +64,14 @@ class BidirectionalClient:
         """
         Async factory method that constructs AND connects a session.
         """
-        self = cls(engineType, connection)
-        await self._connect()
+        while True:
+            try:
+                self = cls(engineType, connection)
+                await self._connect()
+                break
+            except Exception as e:
+                print(f"Error during connection: {e}. Retrying...")
+                time.sleep(5)
         return self
 
     # ----------------------------------------
@@ -151,11 +161,39 @@ class LlmClient:
     async def connect(self):
         self.client = await BidirectionalClient.create("llm",self.connection)
     
-    async def SendSurely(self, message):
+    def download_blob(self,sas_url):
+        response = requests.get(sas_url)
+        response.raise_for_status()  # Raise an exception for bad status codes (4xx or 5xx)
+        return response.text
+    
+    def dict_to_dataclass(self,cls, data):
+        if not isinstance(data, dict):
+            return data
+        fields = {}
+        for field_name, field_type in cls.__annotations__.items():
+            if field_name in data:
+                if hasattr(field_type, '__annotations__'):  # Nested dataclass
+                    fields[field_name] = self.dict_to_dataclass(field_type, data[field_name])
+                else:
+                    fields[field_name] = data[field_name]
+        return cls(**fields)
+
+    async def SendSurely(self, message : SimpleMessage, expect_llmoutput: bool):
         while True:
             try:
                 response = await self.client.send_receive(message)
-                return response.payload.decode()
+                reader=ChunkReader(response.payload)
+                if expect_llmoutput:
+                    data_dict = json.loads(reader.read_str())
+                    llmOut = self.dict_to_dataclass(LlmOutput, data_dict)
+                    simpleOut=LlmSimpleOutput(llmOut.answer,llmOut.error)
+                    if llmOut.answerReference!=None:
+                        #retrieve answer from blob storage
+                        data_dict = json.loads(self.download_blob(llmOut.answerReference))
+                        simpleOut.answer = self.dict_to_dataclass(CachedEntry, data_dict)
+                    return simpleOut
+                else:
+                    return None
             except Exception as e:
                 print(f"Error during Ask: {e}. Retrying...")
                 time.sleep(5)
@@ -163,40 +201,42 @@ class LlmClient:
 
     async def Ask(self, chat : Chat, tags : list[str], cache_only : bool = False, retries: int = -1):
         writer=ChunkWriter()
-        writer.write_str(chat.getJSON())
+        writer.write_str(json.dumps(chat.to_dict(), indent=4))
         writer.write_str(json.dumps(tags))
         if cache_only:
             writer.write_int(1)
         else:
             writer.write_int(0)
         writer.write_int(retries)
-        return await self.SendSurely(SimpleMessage(mtype="ask", payload=writer.close()))
+        return await self.SendSurely(SimpleMessage(mtype="ask", payload=writer.close()),True)
 
-    async def AskMany(self, chats : list[Chat], tags : list[str], retries: int = -1):
+    async def AskBackground(self, chats : list[Chat], tags : list[str], retries: int = -1):
         writer=ChunkWriter()
-        writer.write_str(json.dumps(chats, default=lambda obj: obj.getJSON(), indent=4))
+        writer.write_str(json.dumps(chats, default=lambda obj: obj.to_dict(), indent=4))
         writer.write_str(json.dumps(tags))
-        writer.write_int(retries)        
-        return await self.SendSurely(SimpleMessage(mtype="askmany", payload=writer.close()))
+        writer.write_int(retries)
+        await self.SendSurely(SimpleMessage(mtype="askmany", payload=writer.close()),False) 
 
     async def Embed(self, input : Embedding, tags : list[str], cache_only : bool = False, retries: int = -1):
         writer=ChunkWriter()
-        writer.write_str(input.getJSON())
+        writer.write_str(json.dumps(input.to_dict(), indent=4))
         writer.write_str(json.dumps(tags))
         if cache_only:
             writer.write_int(1)
         else:
             writer.write_int(0)
         writer.write_int(retries)
-        return await self.SendSurely(SimpleMessage(mtype="embed", payload=writer.close()))
+        return await self.SendSurely(SimpleMessage(mtype="embed", payload=writer.close()),True)
 
-    async def AskMany(self, inputs : list[Embedding], tags : list[str], retries: int = -1):
+    async def EmbedBackground(self, inputs : list[Embedding], tags : list[str], retries: int = -1):
         writer=ChunkWriter()
-        writer.write_str(json.dumps(inputs, default=lambda obj: obj.getJSON(), indent=4))
+        writer.write_str(json.dumps(inputs, default=lambda obj: obj.to_dict(), indent=4))
         writer.write_str(json.dumps(tags))
         writer.write_int(retries)        
-        return await self.SendSurely(SimpleMessage(mtype="embedmany", payload=writer.close()))
+        await self.SendSurely(SimpleMessage(mtype="embedmany", payload=writer.close()),False)
 
+    async def Close(self):
+        await self.client.close()
 
 class LlmFactory:
     def __init__(self):

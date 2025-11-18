@@ -6,23 +6,26 @@ class ChunkWriter:
 
     def write_int(self, num: int):
         v = num
+        if v<0:
+            v=v+2**32
+
         length = 0
         offset = 9
         buf = bytearray(10)
 
         while v >= 0x80:
             if length == 0:
-                buf[offset] = v & 0x7F
+                buf[offset] = (v & 0x7F).to_bytes(1, byteorder='big')[0] 
             else:
-                buf[offset] = v | 0x80
+                buf[offset] = (v | 0x80).to_bytes(10, byteorder='big')[0]
             v >>= 7
             length += 1
             offset -= 1
 
         if length == 0:
-            buf[9] = v
+            buf[9] = v.to_bytes(1, byteorder='big')[0] 
         else:
-            buf[9 - length] = v | 0x80
+            buf[9 - length] = (v | 0x80).to_bytes(1, byteorder='big')[0]
 
         length += 1
         self.buffer_list.append(buf)

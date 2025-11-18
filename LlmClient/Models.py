@@ -26,10 +26,9 @@ class Chat:
     def AddUserMessage(self, message):
         self.query["messages"].append({"role": "user", "content": message})
 
-    def getRaw(self):
-        """Returns the JSON representation of the query."""
+    def to_dict(self):
         return self.query
-
+    
     def getJSON(self):
         """Returns the JSON string representation of the query."""
         return json.dumps(self.query, indent=4)
@@ -43,7 +42,7 @@ class Embedding:
             }
 
 
-    def getRaw(self):
+    def to_dict(self):
         """Returns the JSON representation of the embedding."""
         return self.embedding
 
