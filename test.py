@@ -5,7 +5,6 @@ from LlmClient.Models import Chat
 async def process_chat(chat : Chat, client):
     output=await client.Ask(chat,tags=["example"])
     await client.Close()
-    print("HELLO")
     return output 
 
 async def loop(chats: list[Chat]):

@@ -2,10 +2,10 @@ import asyncio
 from attrs import fields
 import grpc
 import uuid
-from .message_pb2 import SimpleMessage # Your protobuf messages
-from .message_pb2_grpc import MessagesStub  # Your gRPC service stub
-from .ChunkWriter import ChunkWriter  # Utility for writing chunks
-from .ChunkReader import ChunkReader  # Utility for reading chunks
+from .message_pb2 import SimpleMessage 
+from .message_pb2_grpc import MessagesStub 
+from .ChunkWriter import ChunkWriter 
+from .ChunkReader import ChunkReader 
 import os
 from .Models import Chat, Embedding
 from .LlmOutput import CachedEntry, RunMetaData, LlmOutput, LlmSimpleOutput
@@ -16,9 +16,7 @@ import requests
 class GrpcConnection:
     """
     Owns ONE shared gRPC channel.
-    You can create many client sessions (streams) on this channel.
     """
-
     def __init__(self):
         self.channel = grpc.aio.secure_channel(
                     os.environ["LLM_SERVER_URL"],
@@ -30,6 +28,7 @@ class GrpcConnection:
         await self.channel.close()
 
 
+
 class BidirectionalClient:
     """
     A single streaming message client that:
@@ -38,8 +37,8 @@ class BidirectionalClient:
         - has its own heartbeat
     """
 
+
     def __init__(self, engineType: str, connection : GrpcConnection):
-        # no await here!
         self.engineType = engineType
         self.conn = connection
         self.stub = connection.stub
@@ -61,31 +60,43 @@ class BidirectionalClient:
     # ----------------------------------------
     @classmethod
     async def create(cls, engineType: str, connection : GrpcConnection):
-        """
-        Async factory method that constructs AND connects a session.
-        """
         while True:
             try:
                 self = cls(engineType, connection)
                 await self._connect()
                 break
             except Exception as e:
-                print(f"Error during connection: {e}. Retrying...")
+                print(f"Error during connection - retrying...")
                 time.sleep(5)
         return self
 
     # ----------------------------------------
-    # STREAM READERS
+    # STREAM READERS (FIXED)
     # ----------------------------------------
     async def _read_call_stream(self):
-        async for msg in self.call:
-            if self._msg_future and not self._msg_future.done():
-                self._msg_future.set_result(msg)
+        try:
+            async for msg in self.call:
+                if self._msg_future and not self._msg_future.done():
+                    self._msg_future.set_result(msg)
+        except grpc.aio.AioRpcError as e:
+            # Connection died, stop reading gracefully
+            # This prevents "Task exception was never retrieved"
+            # We mark as disconnected so sends will fail and trigger retry logic
+            self.is_connected = False
+        except Exception as e:
+            print(f"Unexpected error in call stream (retrying)")
+            self.is_connected = False
 
     async def _read_heartbeat_stream(self):
-        async for msg in self.heartbeat_call:
-            if self._heartbeat_future and not self._heartbeat_future.done():
-                self._heartbeat_future.set_result(msg)
+        try:
+            async for msg in self.heartbeat_call:
+                if self._heartbeat_future and not self._heartbeat_future.done():
+                    self._heartbeat_future.set_result(msg)
+        except grpc.aio.AioRpcError as e:
+            # Connection died, stop reading gracefully
+            pass 
+        except Exception as e:
+            print(f"Unexpected error in heartbeat stream (retrying)")
 
     # ----------------------------------------
     # MAIN CONNECT LOGIC
@@ -123,14 +134,20 @@ class BidirectionalClient:
 
 
     # ----------------------------------------
-    # HEARTBEAT LOOP
+    # HEARTBEAT LOOP (FIXED)
     # ----------------------------------------
     async def _heartbeat_loop(self):
-        while True:
-            await self.heartbeat_call.write(
-                SimpleMessage(mtype="__heartbeat__", payload=self.guid.encode())
-            )
-            await asyncio.sleep(10)
+        try:
+            while True:
+                if not self.is_connected:
+                    break
+                await self.heartbeat_call.write(
+                    SimpleMessage(mtype="__heartbeat__", payload=self.guid.encode())
+                )
+                await asyncio.sleep(10)
+        except Exception:
+            # If writing fails (connection lost), stop the loop
+            self.is_connected = False
 
     # ----------------------------------------
     # SEND/RECEIVE HELPERS
@@ -143,22 +160,51 @@ class BidirectionalClient:
         return await self._msg_future
 
 
+
     async def close(self):
+        """
+        Gracefully shuts down the streams.
+        """
+        self.is_connected = False
+
+        # 1. Stop the heartbeat task first so we don't try to write to a closing stream
         if self._heartbeat_task:
             self._heartbeat_task.cancel()
+            try:
+                await self._heartbeat_task
+            except asyncio.CancelledError:
+                pass
 
+        # 2. Gracefully close the Main Call
         if self.call:
-            await self.call.done_writing()
+            try:
+                # done_writing() sends an EOF to the server.
+                # The server's loop will exit normally, preventing the error.
+                await self.call.done_writing()
+            except Exception:
+                # If the network is already dead, done_writing might fail.
+                # In that case, we fall back to a hard cancel.
+                self.call.cancel()
 
+        # 3. Gracefully close the Heartbeat Call
         if self.heartbeat_call:
-            await self.heartbeat_call.done_writing()
+            try:
+                await self.heartbeat_call.done_writing()
+            except Exception:
+                self.heartbeat_call.cancel()
+
 
 class LlmClient:
 
     def __init__(self, connection : GrpcConnection):
         self.connection = connection
+        self.client = None # Initialize to None
 
     async def connect(self):
+        # CLEANUP: If a client exists, close it before creating a new one
+        if self.client is not None:
+            await self.client.close()
+            
         self.client = await BidirectionalClient.create("llm",self.connection)
     
     def download_blob(self,sas_url):
@@ -195,9 +241,11 @@ class LlmClient:
                 else:
                     return None
             except Exception as e:
-                print(f"Error during Ask: {e}. Retrying...")
+                print(f"Error during Ask - retrying...")
+                # make a new connection
+                # The connect() method now handles closing the old broken client
+                await self.connect()
                 time.sleep(5)
-
 
     async def Ask(self, chat : Chat, tags : list[str], cache_only : bool = False, retries: int = -1):
         writer=ChunkWriter()
