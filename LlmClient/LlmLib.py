@@ -12,6 +12,9 @@ from .LlmOutput import CachedEntry, RunMetaData, LlmOutput, LlmSimpleOutput
 import json
 import time
 import requests
+import hashlib
+from pathlib import Path
+from dataclasses import asdict
 
 class GrpcConnection:
     """
@@ -248,15 +251,26 @@ class LlmClient:
                 time.sleep(5)
 
     async def Ask(self, chat : Chat, tags : list[str], cache_only : bool = False, retries: int = -1):
+        #check local cache
+        chatJSON=json.dumps(chat.to_dict(), indent=4)
+        hex_hash = hashlib.sha256(chatJSON.encode('utf-8')).hexdigest()
+        cachePath=Path(f"{os.environ["LLM_CACHE"]}/{hex_hash}")
+        if cachePath.exists():
+            with open(cachePath, 'r', encoding='utf-8') as f:
+                data_dict = json.load(f)
+                return self.dict_to_dataclass(LlmSimpleOutput, data_dict)
         writer=ChunkWriter()
-        writer.write_str(json.dumps(chat.to_dict(), indent=4))
+        writer.write_str(chatJSON)
         writer.write_str(json.dumps(tags))
         if cache_only:
             writer.write_int(1)
         else:
             writer.write_int(0)
         writer.write_int(retries)
-        return await self.SendSurely(SimpleMessage(mtype="ask", payload=writer.close()),True)
+        output=await self.SendSurely(SimpleMessage(mtype="ask", payload=writer.close()),True)
+        with open(cachePath, 'w', encoding='utf-8') as f:
+            json.dump(asdict(output), f, indent=4)
+        return output
 
     async def AskBackground(self, chats : list[Chat], tags : list[str], retries: int = -1):
         writer=ChunkWriter()
@@ -266,6 +280,13 @@ class LlmClient:
         await self.SendSurely(SimpleMessage(mtype="askmany", payload=writer.close()),False) 
 
     async def Embed(self, input : Embedding, tags : list[str], cache_only : bool = False, retries: int = -1):
+        inputJSON=json.dumps(input.to_dict(), indent=4)
+        hex_hash = hashlib.sha256(inputJSON.encode('utf-8')).hexdigest()
+        cachePath=Path(f"{os.environ["LLM_CACHE"]}/{hex_hash}")
+        if cachePath.exists():
+            with open(cachePath, 'r', encoding='utf-8') as f:
+                data_dict = json.load(f)
+                return self.dict_to_dataclass(LlmSimpleOutput, data_dict)
         writer=ChunkWriter()
         writer.write_str(json.dumps(input.to_dict(), indent=4))
         writer.write_str(json.dumps(tags))
@@ -274,7 +295,10 @@ class LlmClient:
         else:
             writer.write_int(0)
         writer.write_int(retries)
-        return await self.SendSurely(SimpleMessage(mtype="embed", payload=writer.close()),True)
+        output=await self.SendSurely(SimpleMessage(mtype="embed", payload=writer.close()),True)
+        with open(cachePath, 'w', encoding='utf-8') as f:
+            json.dump(asdict(output), f, indent=4)
+        return output
 
     async def EmbedBackground(self, inputs : list[Embedding], tags : list[str], retries: int = -1):
         writer=ChunkWriter()
@@ -287,7 +311,7 @@ class LlmClient:
         await self.client.close()
 
 class LlmFactory:
-    def __init__(self):
+    def __init__(self):        
         self.connection = GrpcConnection()
 
     async def create_client(self):

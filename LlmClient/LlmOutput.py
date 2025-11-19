@@ -47,3 +47,4 @@ class LlmSimpleOutput:
     def __init__(self, answer : CachedEntry, error : str):
         self.answer = answer
         self.error = error
+
