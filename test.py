@@ -31,7 +31,7 @@ async def loop(chats: list[Chat]):
 chats=[]
 chat = Chat(responseSchema=None) 
 chat.AddSystemMessage("You are a helpful assistant. You will talk like a pirate.")
-chat.AddUserMessage("What's the best way to train a parrot?")
+chat.AddUserMessage("What's the best way to train a swan?")
 chats.append(chat)
 
 #define yesno response schema
