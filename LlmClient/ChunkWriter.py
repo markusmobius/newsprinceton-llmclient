@@ -7,17 +7,17 @@ class ChunkWriter:
     def write_int(self, num: int):
         v = num
         if v<0:
-            v=v+2**32
+            v=v+1<<32
 
+        buf = bytearray(10) 
+        offset = 9 
         length = 0
-        offset = 9
-        buf = bytearray(10)
 
         while v >= 0x80:
             if length == 0:
                 buf[offset] = (v & 0x7F).to_bytes(1, byteorder='big')[0] 
             else:
-                buf[offset] = (v | 0x80).to_bytes(10, byteorder='big')[0]
+                buf[offset] = ((v & 0x7F) | 0x80).to_bytes(1, byteorder='big')[0]
             v >>= 7
             length += 1
             offset -= 1
