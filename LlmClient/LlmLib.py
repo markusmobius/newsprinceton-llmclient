@@ -268,8 +268,9 @@ class LlmClient:
             writer.write_int(0)
         writer.write_int(retries)
         output=await self.SendSurely(SimpleMessage(mtype="ask", payload=writer.close()),True)
-        with open(cachePath, 'w', encoding='utf-8') as f:
-            json.dump(asdict(output), f, indent=4)
+        if output.error is None:
+            with open(cachePath, 'w', encoding='utf-8') as f:
+                json.dump(asdict(output), f, indent=4)
         return output
 
     async def AskBackground(self, chats : list[Chat], tags : list[str], retries: int = -1):

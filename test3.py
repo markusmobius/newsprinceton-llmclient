@@ -30,7 +30,7 @@ async def loop(chats: list[Chat]):
 #response for this request is just a text
 chats=[]
 chat = Chat(responseSchema=None) 
-chat.AddSystemMessage("You are a helpful assistant. You will talk like a pirate.")
+chat.AddSystemMessage("You are a very helpful assistant. You will talk like a pirate.")
 chat.AddUserMessage("What's the best way to train a parrot?")
 chats.append(chat)
 
