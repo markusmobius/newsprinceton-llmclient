@@ -10,7 +10,7 @@ async def main():
     truefacts=[
       "Illustra's printing business in mainland China made record sales.",
       "Illustra's nuclear power division in Japan saw a 20% decline in sales.",
-      "Illustra's appliance division in Florida introduced a veryy successful line of washers."
+      "Illustra's appliance division in Florida introduced a very successful line of washers."
     ]
     recalled="Illustra introduced some washers"
     recall_schema={
