@@ -267,7 +267,6 @@ class LlmClient:
         else:
             writer.write_int(0)
         writer.write_int(retries)
-        print(f"RETRIES: {retries}")
         output=await self.SendSurely(SimpleMessage(mtype="ask", payload=writer.close()),True)
         if output.error is None:
             with open(cachePath, 'w', encoding='utf-8') as f:
