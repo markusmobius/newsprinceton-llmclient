@@ -5,9 +5,7 @@ class ChunkWriter:
         self.length_list = []
 
     def write_int(self, num: int):
-        v = num
-        if v<0:
-            v=v+1<<32
+        v = num & 0xFFFFFFFF
 
         buf = bytearray(10) 
         offset = 9 
