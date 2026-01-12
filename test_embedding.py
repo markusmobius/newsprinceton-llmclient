@@ -5,7 +5,7 @@ async def main():
     factory=LlmFactory()
     client=await factory.create_client()
     #embedding
-    texts=["Hello lila super wunderland story","JFK was the much older brother of RFK (Robert) and the President."]
+    texts=["Hello lila super super super wunderland story","JFK was the much older brother of RFK (Robert) and the President."]
     for text in texts:
         output=await client.Embed(Embedding(text),tags=["example"])
         if output.error!=None:

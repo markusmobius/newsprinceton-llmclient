@@ -8,9 +8,9 @@ async def main():
     client=await factory.create_client()
     #define chat
     truefacts=[
-      "Illustra's printing business in mainland China made record sales.",
-      "Illustra's nuclear power division in Japan saw a 20% decline in sales.",
-      "Illustra's appliance division in Florida introduced a very successful line of washers."
+      "Illustra's printing business in two China provinces made record sales.",
+      "Illustra's nuclear power division in mainland Japan saw a 20% decline in sales.",
+      "Illustra's appliance division in Massachusetts introduced a quite nicely successful line of washers."
     ]
     recalled="Illustra introduced some washers"
     recall_schema={
@@ -32,7 +32,7 @@ async def main():
     }
     chat = Chat(responseSchema=recall_schema) 
     chat.AddSystemMessage("You are a helpful assistant.")
-    chat.AddUserMessage(f"A participant in an experiment attempted to recall a few facts of a fictitious company that we showed to them. Here are the facts as a JSON list {json.dumps(truefacts)}. Here is what they recalled:\"{recalled}\". We ask you to match the recalled response to the best-matching fact using the index in the JSON array of facts. We also ask you to rate the answer on a scale from 0 to 10 where 0 is a very bad match and 10 is a great match. Also explain your reasoning. Provide these three outputs - the JSON index, the rating and the reasoning in a JSON array using the schema ['matching_fact':'fact_index','rating':'your_rating','reasoning':'your reasoning for the rating']")
+    chat.AddUserMessage(f"A participant in an experiment attempted to recall some facts about a fictitious company that we showed to them. Here are the facts as a JSON list {json.dumps(truefacts)}. Here is what they recalled:\"{recalled}\". We ask you to match the recalled response to the best-matching fact using the index in the JSON array of facts. We also ask you to rate the answer on a scale from 0 to 10 where 0 is a very bad match and 10 is a great match. Also explain your reasoning. Provide these three outputs - the JSON index, the rating and the reasoning in a JSON array using the schema ['matching_fact':'fact_index','rating':'your_rating','reasoning':'your reasoning for the rating']")
     #perform the ask
     output=await client.Ask(chat,tags=["example"])
     if output.error!=None:
