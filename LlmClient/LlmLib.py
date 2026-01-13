@@ -254,7 +254,7 @@ class LlmClient:
         #check local cache
         chatJSON=json.dumps(chat.to_dict(), indent=4)
         hex_hash = hashlib.sha256(chatJSON.encode('utf-8')).hexdigest()
-        cachePath=Path(f"{os.environ["LLM_CACHE"]}/{hex_hash}")
+        cachePath=Path(f"{os.environ['LLM_CACHE']}/{hex_hash}")
         if cachePath.exists():
             with open(cachePath, 'r', encoding='utf-8') as f:
                 data_dict = json.load(f)
@@ -283,7 +283,7 @@ class LlmClient:
     async def Embed(self, input : Embedding, tags : list[str], cache_only : bool = False, retries: int = -1):
         inputJSON=json.dumps(input.to_dict(), indent=4)
         hex_hash = hashlib.sha256(inputJSON.encode('utf-8')).hexdigest()
-        cachePath=Path(f"{os.environ["LLM_CACHE"]}/{hex_hash}")
+        cachePath=Path(f"{os.environ['LLM_CACHE']}/{hex_hash}")
         if cachePath.exists():
             with open(cachePath, 'r', encoding='utf-8') as f:
                 data_dict = json.load(f)
