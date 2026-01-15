@@ -230,7 +230,7 @@ class LlmClient:
     async def SendSurely(self, message : SimpleMessage, expect_llmoutput: bool):
         while True:
             try:
-                response = await self.client.send_receive(message)
+                response = await asyncio.wait_for(self.client.send_receive(message), timeout=300)
                 reader=ChunkReader(response.payload)
                 if expect_llmoutput:
                     data_dict = json.loads(reader.read_str())
