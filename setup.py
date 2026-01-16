@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='LlmClient',
-    version='1.0.18',
+    version='1.0.19',
     description='Python library for LLM client',
     url='https://github.com/markusmobius/newsprinceton-llmclient',
     packages=find_packages(),

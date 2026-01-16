@@ -117,7 +117,7 @@ class BidirectionalClient:
 
         # handshake
         hello = SimpleMessage(mtype=self.engineType, payload=self.guid.encode())
-        res = await self.send_receive(hello)
+        res = await asyncio.wait_for(self.send_receive(hello), timeout=10)        
 
         self.from_scratch = (res.mtype == "fresh")
         print("session:", "first-time" if self.from_scratch else "reused")
