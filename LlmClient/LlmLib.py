@@ -10,7 +10,6 @@ import os
 from .Models import Chat, Embedding
 from .LlmOutput import CachedEntry, RunMetaData, LlmOutput, LlmSimpleOutput
 import json
-import time
 import requests
 import hashlib
 from pathlib import Path
@@ -70,7 +69,7 @@ class BidirectionalClient:
                 break
             except Exception as e:
                 print(f"Error during connection - retrying...")
-                time.sleep(5)
+                await asyncio.sleep(5)
         return self
 
     # ----------------------------------------
@@ -244,11 +243,11 @@ class LlmClient:
                 else:
                     return None
             except Exception as e:
-                print(f"Error during Ask - retrying...")
+                print(f"Error while trying to send task to server - retrying...")
                 # make a new connection
                 # The connect() method now handles closing the old broken client
                 await self.connect()
-                time.sleep(5)
+                await asyncio.sleep(5)
 
     async def Ask(self, chat : Chat, tags : list[str], cache_only : bool = False, retries: int = -1):
         #check local cache
