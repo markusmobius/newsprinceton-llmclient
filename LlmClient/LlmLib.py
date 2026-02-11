@@ -210,7 +210,6 @@ class LlmClient:
         self.client = await BidirectionalClient.create("llm",self.connection)
     
     def download_blob(self,sas_url):
-        print(sas_url)
         response = requests.get(sas_url)
         response.raise_for_status()  # Raise an exception for bad status codes (4xx or 5xx)
         return response.content.decode('utf-8')
