@@ -212,7 +212,7 @@ class LlmClient:
     def download_blob(self,sas_url):
         response = requests.get(sas_url)
         response.raise_for_status()  # Raise an exception for bad status codes (4xx or 5xx)
-        return response.text
+        return response.content.decode('utf-8')
     
     def dict_to_dataclass(self,cls, data):
         if not isinstance(data, dict):

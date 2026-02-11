@@ -23,4 +23,3 @@ class ChunkReader:
         val= self.arr[self.offset : (self.offset + len)].decode("utf-8")
         self.offset+=len
         return val
-
