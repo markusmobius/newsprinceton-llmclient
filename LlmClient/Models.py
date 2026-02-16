@@ -1,6 +1,18 @@
 import json
 from jsonschema import Draft202012Validator, SchemaError
 from typing import Any
+import base64
+
+class MessageFragment:
+    def __init__(self):
+        self.content=[]
+    
+    def AddText(self, text :str):
+        self.content.append({"type": "text", "text": text})
+    
+    def AddImage(self, image :bytes, mimeType :str):
+        self.content.append({"type": "image_url", "image_url": {"url": "data:"+mimeType+";base64," + base64.b64encode(image).decode("utf-8")}})
+
 
 class Chat:
     def __init__(self, responseSchema: Any, model : str = "gpt-5-mini_2025-08-07"):
@@ -17,14 +29,24 @@ class Chat:
             }
 
 
-    def AddSystemMessage(self, message):
+    def AddSystemMessage(self, message :str):
         self.query["messages"].append({"role": "system", "content": message})
 
-    def AddAssistantMessage(self, message):
+    def AddSystemMessage(self,fragments: list[MessageFragment]):
+        self.query["messages"].append({"role": "system", "content": fragments})    
+
+    def AddAssistantMessage(self, message :str):
         self.query["messages"].append({"role": "assistant", "content": message})
 
-    def AddUserMessage(self, message):
+    def AddAssistantMessage(self,fragments: list[MessageFragment]):
+        self.query["messages"].append({"role": "assistant", "content": fragments})    
+
+    def AddUserMessage(self, message :str):
         self.query["messages"].append({"role": "user", "content": message})
+
+    def AddUserMessage(self,fragments: list[MessageFragment]):
+        self.query["messages"].append({"role": "user", "content": fragments})    
+
 
     def to_dict(self):
         return self.query
