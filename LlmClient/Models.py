@@ -3,7 +3,7 @@ from jsonschema import Draft202012Validator, SchemaError
 from typing import Any
 import base64
 
-class MessageFragment:
+class MessageFragments:
     def __init__(self):
         self.content=[]
     
@@ -32,20 +32,20 @@ class Chat:
     def AddSystemMessage(self, message :str):
         self.query["messages"].append({"role": "system", "content": message})
 
-    def AddSystemMessageList(self,fragments: list[MessageFragment]):
-        self.query["messages"].append({"role": "system", "content": fragments})    
+    def AddSystemMessageList(self,fragments: MessageFragments):
+        self.query["messages"].append({"role": "system", "content": fragments.content})    
 
     def AddAssistantMessage(self, message :str):
         self.query["messages"].append({"role": "assistant", "content": message})
 
-    def AddAssistantMessageList(self,fragments: list[MessageFragment]):
-        self.query["messages"].append({"role": "assistant", "content": fragments})    
+    def AddAssistantMessageList(self,fragments: MessageFragments):
+        self.query["messages"].append({"role": "assistant", "content": fragments.content})    
 
     def AddUserMessage(self, message :str):
         self.query["messages"].append({"role": "user", "content": message})
 
-    def AddUserMessageList(self,fragments: list[MessageFragment]):
-        self.query["messages"].append({"role": "user", "content": fragments})    
+    def AddUserMessageList(self,fragments: MessageFragments):
+        self.query["messages"].append({"role": "user", "content": fragments.content})    
 
 
     def to_dict(self):
