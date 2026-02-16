@@ -32,19 +32,19 @@ class Chat:
     def AddSystemMessage(self, message :str):
         self.query["messages"].append({"role": "system", "content": message})
 
-    def AddSystemMessage(self,fragments: list[MessageFragment]):
+    def AddSystemMessageList(self,fragments: list[MessageFragment]):
         self.query["messages"].append({"role": "system", "content": fragments})    
 
     def AddAssistantMessage(self, message :str):
         self.query["messages"].append({"role": "assistant", "content": message})
 
-    def AddAssistantMessage(self,fragments: list[MessageFragment]):
+    def AddAssistantMessageList(self,fragments: list[MessageFragment]):
         self.query["messages"].append({"role": "assistant", "content": fragments})    
 
     def AddUserMessage(self, message :str):
         self.query["messages"].append({"role": "user", "content": message})
 
-    def AddUserMessage(self,fragments: list[MessageFragment]):
+    def AddUserMessageList(self,fragments: list[MessageFragment]):
         self.query["messages"].append({"role": "user", "content": fragments})    
 
 
