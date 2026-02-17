@@ -3,3 +3,4 @@ jsonschema
 grpcio
 grpcio-tools
 requests
+python-magic

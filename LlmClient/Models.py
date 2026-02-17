@@ -2,16 +2,23 @@ import json
 from jsonschema import Draft202012Validator, SchemaError
 from typing import Any
 import base64
+import magic
+import mimetypes
 
 class MessageFragments:
     def __init__(self):
         self.content=[]
     
     def AddText(self, text :str):
-        self.content.append({"type": "text", "text": text})
+        self.content.append({"type": "input_text", "text": text})
     
-    def AddImage(self, image :bytes, mimeType :str):
-        self.content.append({"type": "image_url", "image_url": {"url": "data:"+mimeType+";base64," + base64.b64encode(image).decode("utf-8")}})
+    def AddImage(self, image :bytes):
+        mimeType = magic.from_buffer(image, mime=True)
+        self.content.append({"type": "input_image", "image_url": "data:"+mimeType+";base64," + base64.b64encode(image).decode("utf-8")})
+
+    def AddFile(self, doc :bytes):
+        mimeType = magic.from_buffer(doc, mime=True)
+        self.content.append({"type": "input_file", "filename":f"file.{mimetypes.guess_extension(mimeType)}", "file_data": "data:"+mimeType+";base64," + base64.b64encode(doc).decode("utf-8")})
 
 
 class Chat:
