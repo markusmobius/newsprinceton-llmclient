@@ -70,7 +70,7 @@ def get_file_bytes(url):
 chats=[]
 descriptions=[]
 
-# Chat 1: Is this a cat? (With cat image)
+# Extract entrees from PDF file
 menu_url = "https://www.llmserver.econlabs.org/assets/menutest.pdf"
 menu_bytes = get_file_bytes(menu_url)
 chat_menu = Chat(responseSchema=menu_schema)
