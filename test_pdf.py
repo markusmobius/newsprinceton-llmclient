@@ -25,7 +25,7 @@ async def loop(chats: list[Chat],descriptions: list[str]):
       print("")
 
 
-#define menu itesm response schema
+#define menu items response schema
 menu_schema={
                   "type": "object",
                   "properties": {
@@ -52,14 +52,14 @@ menu_schema={
                           "description",
                           "price"
                         ],
-                        "additionalProperties": false
+                        "additionalProperties": False
                       }
                     }
                   },
                   "required": [
                     "menu_items"
                   ],
-                  "additionalProperties": false
+                  "additionalProperties": False
 }
 
 def get_file_bytes(url):
