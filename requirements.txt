@@ -3,5 +3,4 @@ jsonschema
 grpcio
 grpcio-tools
 requests
-python-magic-bin; sys_platform == 'win32'
-python-magic; sys_platform != 'win32'
+puremagic
