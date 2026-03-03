@@ -257,7 +257,7 @@ class LlmClient:
         if cachePath.exists():
             with open(cachePath, 'r', encoding='utf-8') as f:
                 data_dict = json.load(f)
-                return self.dict_to_dataclass(LlmSimpleOutput, data_dict)
+                return self.dict_to_dataclass(LlmSimpleOutput, data_dict["output"])
         writer=ChunkWriter()
         writer.write_str(chatJSON)
         writer.write_str(json.dumps(tags))
@@ -269,7 +269,7 @@ class LlmClient:
         output=await self.SendSurely(SimpleMessage(mtype="ask", payload=writer.close()),True)
         if output.error is None:
             with open(cachePath, 'w', encoding='utf-8') as f:
-                json.dump(asdict(output), f, indent=4)
+                json.dump({"prompt": chat.to_dict(), "output": asdict(output)}, f, indent=4)
         return output
 
     async def AskBackground(self, chats : list[Chat], tags : list[str], retries: int = -1):
@@ -286,7 +286,7 @@ class LlmClient:
         if cachePath.exists():
             with open(cachePath, 'r', encoding='utf-8') as f:
                 data_dict = json.load(f)
-                return self.dict_to_dataclass(LlmSimpleOutput, data_dict)
+                return self.dict_to_dataclass(LlmSimpleOutput, data_dict["output"])
         writer=ChunkWriter()
         writer.write_str(json.dumps(input.to_dict(), indent=4))
         writer.write_str(json.dumps(tags))
@@ -297,7 +297,7 @@ class LlmClient:
         writer.write_int(retries)
         output=await self.SendSurely(SimpleMessage(mtype="embed", payload=writer.close()),True)
         with open(cachePath, 'w', encoding='utf-8') as f:
-            json.dump(asdict(output), f, indent=4)
+            json.dump({"prompt": input.to_dict(), "output": asdict(output)}, f, indent=4)
         return output
 
     async def EmbedBackground(self, inputs : list[Embedding], tags : list[str], retries: int = -1):
