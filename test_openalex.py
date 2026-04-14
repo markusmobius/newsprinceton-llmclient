@@ -15,7 +15,7 @@ async def main():
     factory=LlmFactory()
     client=await factory.create_client()
     
-    prompt = "List all paper in economics on Covid 19 that were published in February 2026 in the American Economic Review, Quarterly Journal of Economics, Review of Economic Studies."
+    prompt = "List all paper in economics on risk preferences from January 2026 in the American Economic Review."
     
     # Run WITHOUT the academic tool
     chat_without_tool = Chat()

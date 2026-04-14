@@ -22,7 +22,7 @@ class MessageFragments:
 
 
 class Chat:
-    def __init__(self, responseSchema: Any = None, model: str = "gpt-5-mini_2025-08-07", tools: list = None):
+    def __init__(self, responseSchema: Any, model : str = "gpt-5-mini_2025-08-07"):
         #check that we have valid JSON schema
         if responseSchema!=None:
             try:
@@ -34,8 +34,6 @@ class Chat:
                 "messages": [],
                 "ResponseSchema": json.dumps(responseSchema)
             }
-        if tools is not None:
-            self.query["tools"] = tools
 
 
     def AddSystemMessage(self, message :str):

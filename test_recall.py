@@ -8,7 +8,7 @@ async def main():
     client=await factory.create_client()
     #define chat
     truefacts=[
-      "Illustra's printing business in two China provinces made record sales.",
+      "Illustra's printing business in three China provinces made record sales.",
       "Illustra's nuclear power division in mainland Japan saw a 20% decline in sales.",
       "Illustra's appliance division in Massachusetts introduced a quite nicely successful line of washers."
     ]
