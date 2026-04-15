@@ -18,11 +18,11 @@ async def main():
     prompt = "List all paper in economics on risk preferences from January 2026 in the American Economic Review."
     
     # Run WITHOUT the academic tool
-    chat_without_tool = Chat()
+    chat_without_tool = Chat(responseSchema=None)
     chat_without_tool.AddUserMessage(prompt)
 
     # Run WITH the academic tool
-    chat_with_tool = Chat(tools=["openalex"])
+    chat_with_tool = Chat(responseSchema=None,tools=["openalex"])
     chat_with_tool.AddSystemMessage("Use the openalex tool to find the academic papers requested.")
     chat_with_tool.AddUserMessage(prompt)
     
