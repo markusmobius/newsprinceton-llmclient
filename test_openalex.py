@@ -2,6 +2,7 @@ import asyncio
 from LlmClient.LlmLib import LlmFactory
 from LlmClient.Models import Chat
 
+
 async def process_chat(chat : Chat, client, name: str):
     output=await client.Ask(chat,tags=["example", name])
     print(f"--- Output for {name} ---")
