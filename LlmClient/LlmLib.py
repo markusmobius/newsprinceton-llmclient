@@ -54,6 +54,7 @@ class BidirectionalClient:
 
         self._msg_future = None
         self._heartbeat_future = None
+        self._stream_dead = None      # the exception that killed the call stream, once it has died
 
         self._heartbeat_task = None
 
@@ -69,6 +70,16 @@ class BidirectionalClient:
                 break
             except Exception as e:
                 print(f"Error during connection - retrying...")
+                # Free what the failed attempt opened: its two streams stay registered on the SHARED channel otherwise,
+                # and after enough failures the channel's stream cap is reached and every later handshake times out
+                # (connection storms seen in the PCM week runs, Oct 2026).
+                self.is_connected = False
+                for call in (self.call, self.heartbeat_call):
+                    if call is not None:
+                        try:
+                            call.cancel()
+                        except Exception:
+                            pass
                 await asyncio.sleep(5)
         return self
 
@@ -76,6 +87,9 @@ class BidirectionalClient:
     # STREAM READERS (FIXED)
     # ----------------------------------------
     async def _read_call_stream(self):
+        # Three ways the stream can end, and every one must fail the pending reply (see _fail_pending): a status error
+        # (AioRpcError), a local cancel (CancelledError, a BaseException that a bare `except Exception` never sees), and a
+        # clean end-of-stream when the server closes the session (no exception at all: the loop just finishes).
         try:
             async for msg in self.call:
                 if self._msg_future and not self._msg_future.done():
@@ -85,9 +99,26 @@ class BidirectionalClient:
             # This prevents "Task exception was never retrieved"
             # We mark as disconnected so sends will fail and trigger retry logic
             self.is_connected = False
+            self._fail_pending(e)
+            return
+        except asyncio.CancelledError:
+            self.is_connected = False
+            self._fail_pending(ConnectionError("call stream cancelled"))
+            raise
         except Exception as e:
             print(f"Unexpected error in call stream (retrying)")
             self.is_connected = False
+            self._fail_pending(e)
+            return
+        self.is_connected = False
+        self._fail_pending(ConnectionError("call stream ended"))
+
+    def _fail_pending(self, exc):
+        """A reply that will never come: fail the waiting send_receive now (and every later one on this dead stream), so
+        SendSurely reconnects at once instead of sitting out its 300 s timeout."""
+        self._stream_dead = exc
+        if self._msg_future and not self._msg_future.done():
+            self._msg_future.set_exception(exc)
 
     async def _read_heartbeat_stream(self):
         try:
@@ -132,7 +163,7 @@ class BidirectionalClient:
 
         writer=ChunkWriter()
         writer.write_str(os.environ["LLM_USER_CODE"])
-        await self.send_receive(SimpleMessage(mtype="__initengine__", payload=writer.close()))
+        await asyncio.wait_for(self.send_receive(SimpleMessage(mtype="__initengine__", payload=writer.close())), timeout=30)
 
 
     # ----------------------------------------
@@ -155,6 +186,8 @@ class BidirectionalClient:
     # SEND/RECEIVE HELPERS
     # ----------------------------------------
     async def send_receive(self, message):
+        if self._stream_dead is not None:
+            raise ConnectionError("call stream is dead") from self._stream_dead
         loop = asyncio.get_running_loop()
         self._msg_future = loop.create_future()
 
